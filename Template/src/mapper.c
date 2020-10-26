@@ -203,6 +203,7 @@ int main(int argc, char *argv[]) {
 		memset(chunkData, '\0', chunkSize + 1);
 
 		char *retChunk = getChunkData(mapperID);
+    
 		if(retChunk == NULL) {
 			break;
 		}

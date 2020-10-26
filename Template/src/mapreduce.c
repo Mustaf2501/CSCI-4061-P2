@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
 	pid_t pid = fork();
 	if(pid == 0){
 		//send chunks of data to the mappers in RR fashion
+    printf("Make it to SCD??? \n"); 
 		sendChunkData(inputFile, nMappers);
 		exit(0);
 	}

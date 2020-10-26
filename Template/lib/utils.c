@@ -1,11 +1,123 @@
 #include "utils.h"
+ 
+struct mymsg_t{
+  long mtype;
+  char mtext[1024];
+};
 
 char *getChunkData(int mapperID) {
+  printf("GET\n");
+  key_t k = 97;
+
+  int  mid = msgget(k,0666|IPC_CREAT); 
+  struct mymsg_t chunk;
+  msgrcv(mid,(void *)&chunk, 1024, mapperID, 0);
+  
+  printf("chunk : %s \n", chunk.mtext); 
+  
+    if (strcmp(chunk.mtext,"END")){
+        return NULL;
+    }
+  // printf("chunk : %s \n", chunk.mtext); 
+    return chunk.mtext;
 }
 
-// sends chunks of size 1024 to the mappers in RR fashion
 void sendChunkData(char *inputFile, int nMappers) {
+  printf("ENter sendChunk\n");
+  key_t key = 97; // One key for one Queue? Or n keys for n Queues??
+
+  int totbytes = 0; // used to see if we've gone past 1024 bytes
+  int newbytes;  // used to see how many bytes the next word is 
+
+  char word [100]; // used to store the next word in the file 
+
+  int mapperid = 1; // start the mapperid at 1 and increment to n
+
+  struct mymsg_t chunk; // holds mapperid and chunk 
+  int mid = msgget(key, 0666|IPC_CREAT);
+
+  
+  FILE * f = fopen(inputFile, "r"); 
+  
+  memset((void *)chunk.mtext, '\0',1024); // blank out chunk 
+  //int mid = msgget(key, 0666|IPC_CREAT);
+ 
+ // go through file a single word at a time 
+ // the next word is stored in word, above. 
+  while(fscanf(f,"%s",word) !=EOF ){
+    
+    
+    // word now holds the next word from the file 
+    newbytes = strlen(word); // store size of word 
+
+    //printf("%s %d\n", word,newbytes);
+    if (totbytes+newbytes+1 <= 1024){ // 
+      // underflow case 
+      
+      strcat(chunk.mtext, strcat(word, " "));  // add word to chunk   
+      
+       // add to totalbytes 
+       totbytes = totbytes + newbytes + 1; // +1 for space character
+       // ...
+
+    }
+    else{
+
+      // overflow case 
+
+      // set chunk id to the current mapperid
+      chunk.mtype = mapperid; 
+
+      // reset totalbytes, since we've exceed 1024 
+
+      totbytes = newbytes + 1; 
+
+      // use system calls to send chunk to Queue
+       
+      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+
+      // wipe chunk with memset
+      memset(chunk.mtext, '\0', 1024); 
+      
+      //add new word to chunk
+      strcat(chunk.mtext, strcat(word," ")); 
+     
+  
+      // increment mapperid ; if it is n then set it to 1.
+      mapperid = mapperid +1 ;
+      if(mapperid > nMappers){
+        mapperid = 1;
+      }
+
+    }
+    
+  }
+  
+  // must send last bytes to Queue... 
+  if(totbytes > 0){
+       // set chunk id to the current mapperid
+      chunk.mtype = mapperid; 
+      //add new word to chunk
+      strcat(chunk.mtext, strcat(word," ")); 
+      // use system calls to send chunk to Queue
+      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+      // wipe chunk with memset
+      memset(chunk.mtext, '\0', 1024); 
+  }
+  
+
+  for(int i =1 ; i < nMappers + 1; i++){
+    
+    msgsnd(mid, "END",sizeof("END"), i);
+
+  }
+
+
+  fclose(f); 
+
 }
+
+
 
 // hash function to divide the list of word.txt files across reducers
 //http://www.cse.yorku.ca/~oz/hash.html
