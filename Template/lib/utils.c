@@ -27,7 +27,7 @@ void shuffle(int nMappers, int nReducers) {
 
 // check if the character is valid for a word
 int validChar(char c){
-	return ((tolower(c) >= 'a') && tolower(c <='z')) ||
+	return (tolower(c) >= 'a' && tolower(c) <='z') ||
 					(c >= '0' && c <= '9');
 }
 
