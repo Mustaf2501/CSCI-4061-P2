@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 	pid_t pid = fork();
 	if(pid == 0){
 		//send chunks of data to the mappers in RR fashion
-    printf("Make it to SCD??? \n"); 
+    //printf("Make it to SCD??? \n"); 
 		sendChunkData(inputFile, nMappers);
 		exit(0);
 	}
@@ -80,5 +80,8 @@ int main(int argc, char *argv[]) {
 	// wait for all children to complete execution
     while (wait(&status) > 0);
 
+  key_t key = 101; // One key for one Queue? Or n keys for n  
+  int mid = msgget(key, 0666|IPC_CREAT);
+  msgctl(mid, IPC_RMID, NULL); 
 	return 0;
 }

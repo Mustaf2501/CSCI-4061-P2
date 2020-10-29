@@ -6,25 +6,29 @@ struct mymsg_t{
 };
 
 char *getChunkData(int mapperID) {
-  printf("GET\n");
-  key_t k = 97;
 
-  int  mid = msgget(k,0666|IPC_CREAT); 
+
+  key_t k =101;
+  int  mid = msgget(k,0666|IPC_CREAT);
   struct mymsg_t chunk;
+
+  memset((void *)chunk.mtext, '\0',1024); // blank out chunk 
+
   msgrcv(mid,(void *)&chunk, 1024, mapperID, 0);
+  char*c = malloc(sizeof(chunk.mtext));  
+  strcpy(c, chunk.mtext);
   
-  printf("chunk : %s \n", chunk.mtext); 
-  
-    if (strcmp(chunk.mtext,"END")){
+  if (strcmp(c,"END") == 0){
+        printf("END MESSAGE RECIEVED : mapperid %d \n", mapperID);  
         return NULL;
     }
-  // printf("chunk : %s \n", chunk.mtext); 
-    return chunk.mtext;
+  
+    return c;
 }
 
 void sendChunkData(char *inputFile, int nMappers) {
-  printf("ENter sendChunk\n");
-  key_t key = 97; // One key for one Queue? Or n keys for n Queues??
+  //printf("ENter sendChunk\n");
+  key_t key = 101; // One key for one Queue? Or n keys for n Queues??
 
   int totbytes = 0; // used to see if we've gone past 1024 bytes
   int newbytes;  // used to see how many bytes the next word is 
@@ -104,11 +108,12 @@ void sendChunkData(char *inputFile, int nMappers) {
       // wipe chunk with memset
       memset(chunk.mtext, '\0', 1024); 
   }
-  
 
+  memset(chunk.mtext, '\0', 1024); 
+  strcat(chunk.mtext, "END"); 
   for(int i =1 ; i < nMappers + 1; i++){
-    
-    msgsnd(mid, "END",sizeof("END"), i);
+      chunk.mtype = i; 
+      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
 
   }
 
