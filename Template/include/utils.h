@@ -14,8 +14,10 @@
 #include <sys/types.h>
 #include <ctype.h>
 
+
 #define chunkSize 1024
 #define MSGSIZE 1100
+
 
 struct msgBuffer {
     long msgType;

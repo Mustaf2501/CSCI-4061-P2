@@ -6,29 +6,29 @@ struct mymsg_t{
 };
 
 char *getChunkData(int mapperID) {
-
-
-  key_t k =101;
-  int  mid = msgget(k,0666|IPC_CREAT);
+  key_t key = ftok("P2", 4061);  
+  //key_t k =101;
+  int  mid = msgget(key,0666|IPC_CREAT);
   struct mymsg_t chunk;
 
   memset((void *)chunk.mtext, '\0',1024); // blank out chunk 
 
   msgrcv(mid,(void *)&chunk, 1024, mapperID, 0);
-  char*c = malloc(sizeof(chunk.mtext));  
+  char*c = malloc(sizeof(chunk.mtext)); 
   strcpy(c, chunk.mtext);
   
   if (strcmp(c,"END") == 0){
         printf("END MESSAGE RECIEVED : mapperid %d \n", mapperID);  
         return NULL;
     }
-  
+    printf("Check\n");
     return c;
 }
 
 void sendChunkData(char *inputFile, int nMappers) {
+   key_t key = ftok("P2", 4061);  
   //printf("ENter sendChunk\n");
-  key_t key = 101; // One key for one Queue? Or n keys for n Queues??
+  //key_t key = 101; // One key for one Queue? Or n keys for n Queues??
 
   int totbytes = 0; // used to see if we've gone past 1024 bytes
   int newbytes;  // used to see how many bytes the next word is 
@@ -48,7 +48,7 @@ void sendChunkData(char *inputFile, int nMappers) {
  
  // go through file a single word at a time 
  // the next word is stored in word, above. 
-  while(fscanf(f,"%s",word) !=EOF ){
+  while(fscanf(f,"%39s",word) !=EOF ){
     
     
     // word now holds the next word from the file 
@@ -97,7 +97,7 @@ void sendChunkData(char *inputFile, int nMappers) {
     
   }
   
-  // must send last bytes to Queue... 
+  // must send last bytes to Queue 
   if(totbytes > 0){
        // set chunk id to the current mapperid
       chunk.mtype = mapperid; 
@@ -108,20 +108,20 @@ void sendChunkData(char *inputFile, int nMappers) {
       // wipe chunk with memset
       memset(chunk.mtext, '\0', 1024); 
   }
-
+  // create END message 
   memset(chunk.mtext, '\0', 1024); 
   strcat(chunk.mtext, "END"); 
+  
+  // send END message to every mapper by associating id of the mapper with the message 
   for(int i =1 ; i < nMappers + 1; i++){
-      chunk.mtype = i; 
+      chunk.mtype = i;
       msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
 
   }
 
-
   fclose(f); 
 
 }
-
 
 
 // hash function to divide the list of word.txt files across reducers
@@ -137,9 +137,70 @@ int hashFunction(char* key, int reducers){
 }
 
 int getInterData(char *key, int reducerID) {
+  key_t key1 = ftok("P2", 4061);
+  //key_t k =101;
+  int  mid = msgget(key1,0666|IPC_CREAT);
+  struct mymsg_t chunk;
+
+  memset((void *)chunk.mtext, '\0',1024); // blank out chunk
+ // printf("After memset\n");
+  ssize_t e = msgrcv(mid,(void *)chunk.mtext, 1024, reducerID, 0);
+  //printf("ERRNUM :%ld \n", e);
+  strcpy(key, chunk.mtext);
+  printf("test %s\n",chunk.mtext);
+  if (strcmp(key,"END") == 0){
+        printf("END MESSAGE RECIEVED : reducerID %d \n", reducerID);
+        return 0;
+    }
+    
+  return 1; 
 }
 
 void shuffle(int nMappers, int nReducers) {
+  key_t key = ftok("P2", 4061); 
+  int reducerID;
+  int  mid = msgget(key,0666|IPC_CREAT);
+  struct mymsg_t chunk;
+  struct dirent* entry;
+  for(int i=0; i<nMappers; i++) {
+    
+    char path[100]; 
+    char strnum[50];
+    strcat(path, "output/MapOut/Map_");
+    sprintf(strnum, "%d", i+1);
+    strcat(path,strnum); // add number
+    
+    DIR* dir = opendir(path);
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+      printf("Test\n");
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))    continue;
+      printf("d_name: %s\n", entry->d_name); //why no print?
+      char filepath[100];
+      strcpy(filepath, path); 
+      strcat(filepath, "/");
+      strcat(filepath, entry->d_name); 
+      printf("filepath : %s \n ", filepath ); 
+      memset(chunk.mtext, '\0', 1024); 
+      strcat(chunk.mtext, filepath); 
+  
+      reducerID = hashFunction(entry->d_name, nReducers);
+      chunk.mtype = reducerID;
+      msgsnd(mid, (void *)&chunk, sizeof(chunk.mtext),0);
+    }
+    
+  }
+
+    // create END message 
+  memset(chunk.mtext, '\0', 1024); 
+  strcat(chunk.mtext, "END"); 
+  
+  // send END message to every mapper by associating id of the mapper with the message 
+  for(int i =1 ; i < nReducers + 1; i++){
+      chunk.mtype = reducerID;
+      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+  }
+  
 }
 
 // check if the character is valid for a word

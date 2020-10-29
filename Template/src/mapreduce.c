@@ -1,5 +1,7 @@
 #include "mapreduce.h"
 
+ 
+
 // execute executables using execvp
 void execute(char **argv, int nProcesses){
 	pid_t  pid;
@@ -80,7 +82,8 @@ int main(int argc, char *argv[]) {
 	// wait for all children to complete execution
     while (wait(&status) > 0);
 
-  key_t key = 101; // One key for one Queue? Or n keys for n  
+  //key_t key = 101; // One key for one Queue? Or n keys for n  
+  key_t key = ftok("P2", 4061);
   int mid = msgget(key, 0666|IPC_CREAT);
   msgctl(mid, IPC_RMID, NULL); 
 	return 0;
