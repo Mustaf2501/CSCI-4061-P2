@@ -86,17 +86,23 @@ int main(int argc, char *argv[]) {
 
   
 	// spawn reducers
-	//char *reducerArgv[] = {"./reducer", NULL, NULL};
-	//execute(reducerArgv, nReducers);
+	char *reducerArgv[] = {"./reducer", NULL, NULL};
+	execute(reducerArgv, nReducers);
 
 	// wait for all children to complete execution
-  //while (wait(&status) > 0);
+  while (wait(&status) > 0);
    
 
  // close the Queue
  key = ftok("./ftok.txt", 4061);
  mid = msgget(key,0666|IPC_CREAT);
- msgctl(mid, IPC_RMID, NULL);
+  
+  //struct mymsg_t chunk;
+ // memset((void *)chunk.mtext, '\0',1024);
+ // msgrcv(mid,(void *)&chunk.mtext, 1024, 1, 0);
+ // printf("recieved : %s", chunk.mtext);
+
+  msgctl(mid, IPC_RMID, NULL);
 
 
  

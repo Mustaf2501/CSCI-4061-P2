@@ -10,7 +10,7 @@ struct mymsg_t{
 char *getChunkData(int mapperID) {
   
   key_t key = ftok("./ftok.txt", 4061); 
-  
+ 
   int  mid = msgget(key,0666|IPC_CREAT);
   //printf("mqid : %d \n",mid);
   struct mymsg_t chunk;
@@ -23,7 +23,7 @@ char *getChunkData(int mapperID) {
   //printf("chunk : %s \n", c);
   
   if (strcmp(c,"END") == 0){
-        printf("END MESSAGE RECIEVED : mapperid %d \n", mapperID);  
+        //printf("END MESSAGE RECIEVED : mapperid %d \n", mapperID);  
         return NULL;
     }
    
@@ -33,6 +33,7 @@ char *getChunkData(int mapperID) {
 // sends chunks of size 1024 to the mappers in RR fashion
 void sendChunkData(char *inputFile, int nMappers) {
    key_t key =ftok("./ftok.txt", 4061); 
+  
   
  
   //printf("ENter sendChunk\n");
@@ -58,7 +59,7 @@ void sendChunkData(char *inputFile, int nMappers) {
  
  // go through file a single word at a time 
  // the next word is stored in word, above. 
-  while(fscanf(f,"%39s",word) !=EOF ){
+  while(fscanf(f,"%s",word) !=EOF ){
     
     
     // word now holds the next word from the file 
@@ -68,7 +69,7 @@ void sendChunkData(char *inputFile, int nMappers) {
     if (totbytes+newbytes+1 <= 1024){ // 
       // underflow case 
       
-      strcat(chunk.mtext, strcat(word, " "));  // add word to chunk   
+          
       
        // add to totalbytes 
        totbytes = totbytes + newbytes + 1; // +1 for space character
@@ -94,7 +95,7 @@ void sendChunkData(char *inputFile, int nMappers) {
       memset(chunk.mtext, '\0', 1024); 
       
       //add new word to chunk
-      strcat(chunk.mtext, strcat(word," ")); 
+       
      
   
       // increment mapperid ; if it is n then set it to 1.
@@ -104,11 +105,14 @@ void sendChunkData(char *inputFile, int nMappers) {
       }
 
     }
+
+    strcat(chunk.mtext, strcat(word, " "));  // add word to chunk
     
   }
   
   // must send last bytes to Queue 
   if(totbytes > 0){
+      
        // set chunk id to the current mapperid
       chunk.mtype = mapperid; 
       //add new word to chunk
@@ -158,11 +162,15 @@ int getInterData(char *key, int reducerID) {
 
   struct mymsg_t chunk;
 
+
   memset((void *)chunk.mtext, '\0',1024); // blank out chunk
- // printf("After memset\n");
-  msgrcv(mid,(void *)chunk.mtext, 1024, reducerID, 0);
-  
-  strcpy(key, chunk.mtext);
+  msgrcv(mid,(void *)&chunk, 1024, reducerID, 0);
+   char*c = malloc(sizeof(chunk.mtext)); 
+   strcpy(c, chunk.mtext);
+
+   printf("cstuff : %s \n",c);
+   strcpy(key, c);
+  printf("After string copy\n");
   
   if (strcmp(key,"END") == 0){
         printf("END MESSAGE RECIEVED : reducerID %d \n", reducerID);
@@ -174,24 +182,25 @@ int getInterData(char *key, int reducerID) {
 
 void shuffle(int nMappers, int nReducers) {
   key_t key = ftok("./ftok.txt", 4061);  
+   
 
    struct mymsg_t chunk;
   
   int reducerID;
   int  mid = msgget(key,0666|IPC_CREAT);
-  printf("shuffle mqid : %d \n",mid);
+  //printf("shuffle mqid : %d \n",mid);
  
   struct dirent* entry;
    
   for(int i=1; i<nMappers+1; i++) {
      
-    char path[100] = "output/MapOut/Map_";
+    char path[50] = "output/MapOut/Map_";
     char strnum[5];
     
     sprintf(strnum,"%d",i);
     strcat(path,strnum); // add number
 
-    printf("%s\n", path);
+    //printf("%s\n", path);
 
  
       
@@ -202,28 +211,29 @@ void shuffle(int nMappers, int nReducers) {
       if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))    continue;
 
        struct mymsg_t filechunk;
-       
 
-      
       memset(filechunk.mtext, '\0', 1024);
 
-      char filepath[100] =""; 
+      char filepath[50] =""; 
       strcpy(filepath, path); 
       strcat(filepath, "/");
       strcat(filepath, entry->d_name); 
        
       strcat(filechunk.mtext, filepath); 
 
-      printf("filepath : %s \n ", filechunk.mtext );
+      //printf("filepath : %s \n ", filechunk.mtext );
   
       reducerID = hashFunction(entry->d_name, nReducers);
       //printf("%d \n",reducerID);
       filechunk.mtype = reducerID+1;
+
+      msgsnd(mid, (void *)&filechunk,sizeof(filechunk.mtext),0);
+
        
      
   }
 
-  printf("__________\n");
+  //printf("__________\n");
 
   }
   
