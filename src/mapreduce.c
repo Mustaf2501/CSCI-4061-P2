@@ -73,8 +73,18 @@ int main(int argc, char *argv[]) {
 
   key_t key = ftok("./ftok.txt", 4061);
   int  mid = msgget(key,0666|IPC_CREAT);
-   msgctl(mid, IPC_RMID, NULL);
+   
+  if(mid == -1){
+    perror("Failed to get Queue ID");
+    exit(0); 
+  }
 
+  int delq1 = msgctl(mid, IPC_RMID, NULL); // delete queue after sendChunkData
+   
+  if(delq1 == -1){
+    perror("Failed delete Queue");
+    exit(0); 
+  }
 
    
  	pid = fork();
@@ -97,15 +107,26 @@ int main(int argc, char *argv[]) {
  key = ftok("./ftok.txt", 4061);
  mid = msgget(key,0666|IPC_CREAT);
   
-  //struct mymsg_t chunk;
- // memset((void *)chunk.mtext, '\0',1024);
- // msgrcv(mid,(void *)&chunk.mtext, 1024, 1, 0);
- // printf("recieved : %s", chunk.mtext);
-
-  msgctl(mid, IPC_RMID, NULL);
-
+  if(mid == -1){
+    perror("Failed to get Queue ID");
+    exit(0); 
+  }
 
  
+
+  int delq2 = msgctl(mid, IPC_RMID, NULL); // final deletion of queue 
+
+  if (delq2 == -1){
+    perror("Failed to get Queue ID");
+    exit(0); 
+  }
+
+   
+  if(mid == -1){
+    perror("Failed to get Queue ID");
+    exit(0); 
+  }
+
 
 	return 0;
 }

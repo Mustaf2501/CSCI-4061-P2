@@ -9,21 +9,30 @@ struct mymsg_t{
 
 char *getChunkData(int mapperID) {
   
-  key_t key = ftok("./ftok.txt", 4061); 
+  key_t key = ftok("./ftok.txt", 4061); // create key 
  
-  int  mid = msgget(key,0666|IPC_CREAT);
-  //printf("mqid : %d \n",mid);
+  int mid = msgget(key,0666|IPC_CREAT); // get queue from key
+  
+  if (mid == -1){
+   perror("Failed to create message queue\n");
+   exit(0);
+  }
+
   struct mymsg_t chunk;
 
   memset((void *)chunk.mtext, '\0',1024); // blank out chunk 
 
-  msgrcv(mid,(void *)&chunk, 1024, mapperID, 0);
+  int check = msgrcv(mid,(void *)&chunk, 1024, mapperID, 0); // recieve from Queue 
+
+  if (check  == (ssize_t)-1){
+    perror("Failed to recieve message\n");
+    exit(0);
+  }
+
   char*c = malloc(sizeof(chunk.mtext)); 
-  strcpy(c, chunk.mtext);
-  //printf("chunk : %s \n", c);
+  strcpy(c, chunk.mtext); // copy from recieved to c
   
   if (strcmp(c,"END") == 0){
-        //printf("END MESSAGE RECIEVED : mapperid %d \n", mapperID);  
         return NULL;
     }
    
@@ -34,10 +43,7 @@ char *getChunkData(int mapperID) {
 void sendChunkData(char *inputFile, int nMappers) {
    key_t key =ftok("./ftok.txt", 4061); 
   
-  
- 
-  //printf("ENter sendChunk\n");
-  //key_t key = 101; // One key for one Queue? Or n keys for n Queues??
+
 
   int totbytes = 0; // used to see if we've gone past 1024 bytes
   int newbytes;  // used to see how many bytes the next word is 
@@ -47,15 +53,19 @@ void sendChunkData(char *inputFile, int nMappers) {
   int mapperid = 1; // start the mapperid at 1 and increment to n
 
   struct mymsg_t chunk; // holds mapperid and chunk 
+
+  
   int mid = msgget(key, 0666|IPC_CREAT);
-  //printf("mqid : %d \n",mid);
-  //printf("%d \n", mid);
+  
+  if(mid == -1){
+    perror("Failed to get Queue ID\n");
+    exit(0); 
+  }
 
   
   FILE * f = fopen(inputFile, "r"); 
   
   memset((void *)chunk.mtext, '\0',1024); // blank out chunk 
-  //int mid = msgget(key, 0666|IPC_CREAT);
  
  // go through file a single word at a time 
  // the next word is stored in word, above. 
@@ -65,11 +75,8 @@ void sendChunkData(char *inputFile, int nMappers) {
     // word now holds the next word from the file 
     newbytes = strlen(word); // store size of word 
 
-    //printf("%s %d\n", word,newbytes);
     if (totbytes+newbytes+1 <= 1024){ // 
       // underflow case 
-      
-          
       
        // add to totalbytes 
        totbytes = totbytes + newbytes + 1; // +1 for space character
@@ -84,20 +91,16 @@ void sendChunkData(char *inputFile, int nMappers) {
       chunk.mtype = mapperid; 
 
       // reset totalbytes, since we've exceed 1024 
-
       totbytes = newbytes + 1; 
 
       // use system calls to send chunk to Queue
-       
-      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+      int check = msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0); 
+      if (check == -1){
+        perror("Message send failed\n");
+        exit(0);
+      }
+       memset(chunk.mtext, '\0', 1024); 
 
-      // wipe chunk with memset
-      memset(chunk.mtext, '\0', 1024); 
-      
-      //add new word to chunk
-       
-     
-  
       // increment mapperid ; if it is n then set it to 1.
       mapperid = mapperid +1 ;
       if(mapperid > nMappers){
@@ -116,9 +119,13 @@ void sendChunkData(char *inputFile, int nMappers) {
        // set chunk id to the current mapperid
       chunk.mtype = mapperid; 
       //add new word to chunk
-      strcat(chunk.mtext, strcat(word," ")); 
+      //strcat(chunk.mtext, strcat(word," ")); 
       // use system calls to send chunk to Queue
-      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+      int check1 = msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+      if (check1 == -1){
+        perror("Message send failed\n");
+        exit(0);
+      }
       // wipe chunk with memset
       memset(chunk.mtext, '\0', 1024); 
   }
@@ -130,15 +137,15 @@ void sendChunkData(char *inputFile, int nMappers) {
   // send END message to every mapper by associating id of the mapper with the message 
   for(int i =1 ; i < nMappers + 1; i++){
       chunk.mtype = i;
-      msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0);
+      int check2 = msgsnd(mid, (void *)&chunk,sizeof(chunk.mtext),0) ;
+      if(check2== -1){
+        perror("Message send failed\n");
+        exit(0);
+      }
 
   }
 
   fclose(f); 
- 
-  
-  //msgctl(mid, IPC_RMID, NULL); 
-
 }
 
 
@@ -159,21 +166,29 @@ int getInterData(char *key, int reducerID) {
   
   
   int  mid = msgget(key1,0666|IPC_CREAT);
+  if(mid == -1){
+     perror("Failed to get Queue ID\n");
+    exit(0);
 
-  struct mymsg_t chunk;
+  }
+
+  struct mymsg_t chunk; // holds recieved message
 
 
   memset((void *)chunk.mtext, '\0',1024); // blank out chunk
-  msgrcv(mid,(void *)&chunk, 1024, reducerID, 0);
-   char*c = malloc(sizeof(chunk.mtext)); 
-   strcpy(c, chunk.mtext);
+  int rcv = msgrcv(mid,(void *)&chunk, 1024, reducerID, 0);
 
-   printf("cstuff : %s \n",c);
-   strcpy(key, c);
-  printf("After string copy\n");
+  if (rcv == -1){
+    perror("Failed to get recieve from Queue\n");
+    exit(0);
+
+  }
+   char*c = malloc(sizeof(chunk.mtext)); // allocate space for chunk
+   strcpy(c, chunk.mtext); // copy chunk into allocated space
+
+   strcpy(key, c);// copy recieved chunk to key
   
   if (strcmp(key,"END") == 0){
-        printf("END MESSAGE RECIEVED : reducerID %d \n", reducerID);
         return 0;
     }
     
@@ -187,22 +202,21 @@ void shuffle(int nMappers, int nReducers) {
    struct mymsg_t chunk;
   
   int reducerID;
-  int  mid = msgget(key,0666|IPC_CREAT);
-  //printf("shuffle mqid : %d \n",mid);
+  int mid = mid = msgget(key,0666|IPC_CREAT);
+  if (mid == -1){
+   perror("Failed to create message queue\n");
+   exit(0);
+  }
  
   struct dirent* entry;
    
   for(int i=1; i<nMappers+1; i++) {
      
-    char path[50] = "output/MapOut/Map_";
+    char path[50] = "output/MapOut/Map_"; // path of file 
     char strnum[5];
     
     sprintf(strnum,"%d",i);
     strcat(path,strnum); // add number
-
-    //printf("%s\n", path);
-
- 
       
     DIR* dir = opendir(path);
     struct dirent* entry;
@@ -213,27 +227,24 @@ void shuffle(int nMappers, int nReducers) {
        struct mymsg_t filechunk;
 
       memset(filechunk.mtext, '\0', 1024);
-
+      // create and add file's path
       char filepath[50] =""; 
       strcpy(filepath, path); 
       strcat(filepath, "/");
       strcat(filepath, entry->d_name); 
-       
       strcat(filechunk.mtext, filepath); 
-
-      //printf("filepath : %s \n ", filechunk.mtext );
   
       reducerID = hashFunction(entry->d_name, nReducers);
-      //printf("%d \n",reducerID);
+
       filechunk.mtype = reducerID+1;
 
-      msgsnd(mid, (void *)&filechunk,sizeof(filechunk.mtext),0);
-
-       
-     
+      int check3 = msgsnd(mid, (void *)&filechunk,sizeof //send file to a reducer chosen by hash function
+      (filechunk.mtext),0);
+      if (check3 == -1){
+        perror("Message send failed\n");
+        exit(0);
+      } 
   }
-
-  //printf("__________\n");
 
   }
   
